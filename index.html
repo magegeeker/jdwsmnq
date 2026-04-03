@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <title>掘地武士模拟器 | 考古本科生涯·硬核抉择</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* 样式保持不变，省略重复代码，实际使用中请复制完整样式 */
+        body { font-family: 'Noto Sans SC', system-ui, -apple-system, sans-serif; background: #0b1120; color: #e2e8f0; min-height: 100vh; display: flex; flex-direction: column; }
+        .card { background: rgba(15, 23, 42, 0.75); backdrop-filter: blur(8px); border: 1px solid #334155; border-radius: 24px; transition: all 0.2s; }
+        .stat-bar { height: 8px; border-radius: 8px; width: 100%; background: #1e293b; overflow: hidden; }
+        .stat-fill { height: 100%; transition: width 0.4s cubic-bezier(0.2, 0.9, 0.4, 1.1); }
+        #storyText { line-height: 1.75; font-size: 1.05rem; white-space: pre-wrap; letter-spacing: 0.01em; }
+        .btn-choice { transition: all 0.2s ease; border: 1px solid #334155; background: rgba(30, 41, 59, 0.6); text-align: left; padding: 12px 20px; border-radius: 16px; }
+        .btn-choice:hover { background: rgba(59, 130, 246, 0.25); border-color: #f59e0b; transform: translateX(6px); }
+        .loader { border: 3px solid #334155; border-top: 3px solid #f59e0b; border-radius: 50%; width: 36px; height: 36px; animation: spin 0.8s linear infinite; margin: 20px auto; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .ending-tag { font-size: 0.7rem; padding: 4px 12px; border-radius: 30px; font-weight: 600; letter-spacing: 0.03em; }
+        .tag-gold { background: #fbbf24; color: #0f172a; }
+        .tag-red { background: #dc2626; color: white; }
+        .tag-gray { background: #475569; color: #f1f5f9; }
+        .tag-green { background: #10b981; color: #0f172a; }
+        .tag-blue { background: #3b82f6; color: white; }
+        ::-webkit-scrollbar { width: 5px; }
+        ::-webkit-scrollbar-track { background: #0f172a; }
+        ::-webkit-scrollbar-thumb { background: #f59e0b; border-radius: 8px; }
+        .turn-counter { background: #1e293b; display: inline-block; padding: 2px 12px; border-radius: 40px; font-size: 0.75rem; font-weight: bold; color: #f59e0b; }
+        .quiz-option { background: rgba(30, 41, 59, 0.9); border: 1px solid #475569; transition: all 0.15s; }
+        .quiz-option:hover { background: #334155; border-color: #f59e0b; transform: scale(0.98); }
+        .random-badge { background: #f59e0b20; border: 1px dashed #f59e0b; font-size: 0.7rem; padding: 2px 8px; border-radius: 30px; display: inline-block; }
+        .error-message { background: #dc262620; border: 1px solid #dc2626; color: #fca5a5; padding: 12px; border-radius: 16px; font-size: 0.9rem; }
+        .warning-banner { background: #f59e0b20; border: 1px solid #f59e0b; color: #fde047; padding: 8px; border-radius: 12px; font-size: 0.8rem; text-align: center; margin-bottom: 16px; }
+    </style>
+</head>
+<body class="p-4 md:p-6 max-w-3xl mx-auto flex flex-col min-h-screen">
+    <header class="mb-5 text-center">
+        <h1 class="text-4xl font-black bg-gradient-to-r from-amber-400 to-orange-500 bg-clip-text text-transparent tracking-tight">⚔️ 掘地武士模拟器</h1>
+        <p class="text-slate-400 text-sm mt-1">掘地武士 · 田野求生 · 职场内卷 · 躺平等死</p>
+    </header>
+
+    <!-- 安全警告（仅当使用前端直接调用时显示） -->
+    <div id="securityWarning" class="warning-banner" style="display: none;">
+         
+    </div>
+
+    <div id="appContainer">
+        <!-- 角色创建界面 -->
+        <div id="characterCreation" class="card p-6 mb-5 shadow-2xl">
+            <h2 class="text-2xl font-bold text-amber-400 mb-2 text-center">🏺 掘地武士 · 前世今生</h2>
+            <p class="text-slate-300 text-center mb-2 text-sm">每次开局都会遇到不同的问题，塑造独特的你</p>
+            <p class="text-center text-xs text-amber-500/80 mb-6"><span class="random-badge">🎲 题目/选项随机抽取 + 数值随机波动 ±3</span> 每局都是独一无二的开始</p>
+            <div id="quizQuestions" class="space-y-6"></div>
+            <div class="flex justify-center mt-8">
+                <button id="startGameBtn" class="bg-amber-600 hover:bg-amber-500 text-white font-bold py-3 px-8 rounded-full transition-all shadow-lg disabled:opacity-50" disabled>⚡ 开始发掘生涯</button>
+            </div>
+        </div>
+
+        <!-- 游戏主界面 -->
+        <div id="gameMain" style="display: none;">
+            <div class="flex justify-between items-center mb-2">
+                <div class="turn-counter" id="turnCounter">第 0 / 30 回合</div>
+                <div class="text-xs text-slate-500">⚡ 1~30回合内必定迎来结局</div>
+            </div>
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+                <div class="card p-3 shadow-md">
+                    <div class="flex justify-between text-xs font-bold text-emerald-300"><span>❤️ 健康</span><span id="val-health">80</span></div>
+                    <div class="stat-bar mt-1"><div id="bar-health" class="stat-fill bg-emerald-500" style="width: 80%"></div></div>
+                    <p class="text-[10px] text-slate-500 mt-1">体力/抗压</p>
+                </div>
+                <div class="card p-3 shadow-md">
+                    <div class="flex justify-between text-xs font-bold text-amber-300"><span>📖 学术</span><span id="val-academic">50</span></div>
+                    <div class="stat-bar mt-1"><div id="bar-academic" class="stat-fill bg-amber-500" style="width: 50%"></div></div>
+                    <p class="text-[10px] text-slate-500 mt-1">发掘/理论</p>
+                </div>
+                <div class="card p-3 shadow-md">
+                    <div class="flex justify-between text-xs font-bold text-blue-300"><span>🤝 人脉</span><span id="val-social">50</span></div>
+                    <div class="stat-bar mt-1"><div id="bar-social" class="stat-fill bg-blue-500" style="width: 50%"></div></div>
+                    <p class="text-[10px] text-slate-500 mt-1">圈子/关系</p>
+                </div>
+                <div class="card p-3 shadow-md">
+                    <div class="flex justify-between text-xs font-bold text-yellow-300"><span>💰 财富</span><span id="val-wealth">20</span></div>
+                    <div class="stat-bar mt-1"><div id="bar-wealth" class="stat-fill bg-yellow-500" style="width: 20%"></div></div>
+                    <p class="text-[10px] text-slate-500 mt-1">经费/收入</p>
+                </div>
+            </div>
+
+            <div class="card flex-1 p-6 mb-5 min-h-[320px] shadow-2xl relative border-l-4 border-l-amber-500">
+                <div id="loaderContainer" class="absolute inset-0 flex items-center justify-center bg-black/40 backdrop-blur-sm rounded-2xl z-10 hidden">
+                    <div class="loader"></div>
+                </div>
+                <div id="storyText" class="text-slate-100 leading-relaxed">正在加载掘地武士的传奇……</div>
+            </div>
+
+            <div id="choices" class="space-y-3 mb-4"></div>
+        </div>
+    </div>
+
+    <footer class="text-center text-slate-600 text-xs py-3 border-t border-slate-800/50">
+        ⚡ AI 实时生成 | 每个选择都将影响你的考古生涯 | 12种结局，1~30回合内必终结
+    </footer>
+
+    <script>
+        // ======================= 警告 =======================
+        // 注意：API 密钥直接暴露在前端，存在被盗用风险。
+        // 正式部署请改用后端代理（如 Vercel Serverless Functions）。
+        // 此处仅为方便测试，请勿在生产环境使用。
+        // ====================================================
+        const DEEPSEEK_API_KEY = "sk-e1cfec5129aa4a7c99b6366db7af48d2";
+        const DEEPSEEK_API_URL = "https://api.deepseek.com/v1/chat/completions";
+        const MODEL_NAME = "deepseek-chat";
+
+        // 显示安全警告（可选）
+        document.getElementById('securityWarning').style.display = 'block';
+
+        // ---------- 大型题库 (15道题，每次随机抽取5个不同的题目) ----------
+        const MASTER_QUESTION_SET = [
+            { text: "📚 大学期间，你最喜欢哪门课？", options: [{ text: "田野考古学", mod: { health: 5, academic: 8, social: 2, wealth: 0 } }, { text: "文物修复技术", mod: { health: 2, academic: 6, social: 3, wealth: 2 } }, { text: "文化遗产管理", mod: { health: 0, academic: 4, social: 8, wealth: 3 } }, { text: "考古绘图与摄影", mod: { health: 3, academic: 5, social: 4, wealth: 1 } }] },
+            { text: "🏋️ 你的体能状况如何？", options: [{ text: "铁人三项选手", mod: { health: 15, academic: -2, social: 2, wealth: 0 } }, { text: "普通青年，偶尔健身", mod: { health: 5, academic: 0, social: 0, wealth: 0 } }, { text: "体弱多病，常年伏案", mod: { health: -8, academic: 5, social: 2, wealth: 2 } }, { text: "野外拉练能手", mod: { health: 10, academic: 3, social: 3, wealth: 1 } }] },
+            { text: "🤝 在院系里，你的人缘怎么样？", options: [{ text: "社交达人，老师同学都喜欢", mod: { health: 2, academic: 2, social: 15, wealth: 3 } }, { text: "独行侠，专注学术", mod: { health: 0, academic: 8, social: -5, wealth: 1 } }, { text: "小圈子核心，有点人脉", mod: { health: 1, academic: 3, social: 10, wealth: 2 } }, { text: "社恐，几乎没有朋友", mod: { health: -2, academic: 4, social: -10, wealth: -2 } }] },
+            { text: "💰 大学期间的经济状况？", options: [{ text: "家境殷实，不愁经费", mod: { health: 2, academic: 3, social: 5, wealth: 15 } }, { text: "勤工俭学，勉强糊口", mod: { health: 0, academic: 2, social: 3, wealth: 0 } }, { text: "捉襟见肘，靠助学贷款", mod: { health: -3, academic: 4, social: -2, wealth: -10 } }, { text: "接商业考古项目攒钱", mod: { health: -2, academic: -1, social: 4, wealth: 12 } }] },
+            { text: "🎯 你对未来的职业规划？", options: [{ text: "成为学术大牛，读博留校", mod: { health: -2, academic: 12, social: 3, wealth: -2 } }, { text: "进入文物局，走仕途", mod: { health: 0, academic: 4, social: 10, wealth: 4 } }, { text: "去一线工地，做田野英雄", mod: { health: 8, academic: 6, social: 2, wealth: 2 } }, { text: "赚钱优先，考古公司/倒腾文物", mod: { health: -1, academic: -3, social: -2, wealth: 15 } }] },
+            { text: "🔍 你更擅长哪种考古技能？", options: [{ text: "地层学与类型学", mod: { health: 2, academic: 10, social: 0, wealth: 1 } }, { text: "遥感与GIS分析", mod: { health: 1, academic: 7, social: 2, wealth: 3 } }, { text: "文物修复与保护", mod: { health: 0, academic: 6, social: 4, wealth: 4 } }, { text: "田野发掘实操", mod: { health: 6, academic: 5, social: 3, wealth: 2 } }] },
+            { text: "🌍 你更愿意去哪里工作？", options: [{ text: "一线城市考古所", mod: { health: -2, academic: 5, social: 6, wealth: 5 } }, { text: "边疆重大遗址", mod: { health: -5, academic: 8, social: 2, wealth: 8 } }, { text: "家乡文保中心", mod: { health: 3, academic: 2, social: 8, wealth: 2 } }, { text: "私人考古公司", mod: { health: -3, academic: -2, social: 3, wealth: 12 } }] },
+            { text: "📝 你的论文写作能力？", options: [{ text: "发表过核心期刊", mod: { health: -1, academic: 12, social: 4, wealth: 0 } }, { text: "能写但不突出", mod: { health: 0, academic: 5, social: 2, wealth: 0 } }, { text: "最头疼写论文", mod: { health: 2, academic: -5, social: -1, wealth: -1 } }, { text: "擅长项目申报书", mod: { health: 0, academic: 6, social: 5, wealth: 5 } }] },
+            { text: "🧑‍🏫 实习期间，导师对你的评价？", options: [{ text: "勤奋踏实，可堪大用", mod: { health: 3, academic: 6, social: 5, wealth: 2 } }, { text: "聪明但不够细心", mod: { health: 1, academic: 4, social: 2, wealth: 1 } }, { text: "有野心但爱偷懒", mod: { health: -2, academic: -2, social: -2, wealth: 3 } }, { text: "完全无法胜任田野", mod: { health: -5, academic: -3, social: -5, wealth: -2 } }] },
+            { text: "⚙️ 你如何看待文物市场的灰色地带？", options: [{ text: "坚决抵制，维护法纪", mod: { health: 1, academic: 2, social: 5, wealth: 0 } }, { text: "可以适当参与小买卖", mod: { health: 0, academic: -3, social: -2, wealth: 10 } }, { text: "只要有钱什么都敢做", mod: { health: -2, academic: -5, social: -8, wealth: 18 } }, { text: "不关心，专注学术", mod: { health: 2, academic: 5, social: 1, wealth: -1 } }] },
+            { text: "🏕️ 你对田野驻地的艰苦条件适应能力？", options: [{ text: "吃苦耐劳，以地为席", mod: { health: 10, academic: 3, social: 2, wealth: 1 } }, { text: "勉强能忍，但会抱怨", mod: { health: 2, academic: 1, social: -1, wealth: 0 } }, { text: "无法忍受，需要星级酒店", mod: { health: -8, academic: -2, social: -3, wealth: -2 } }, { text: "自带帐篷，享受荒野", mod: { health: 7, academic: 0, social: 3, wealth: -1 } }] },
+            { text: "🎓 你的外语水平（阅读考古报告）？", options: [{ text: "精通英日德，直接读原文", mod: { health: 0, academic: 12, social: 3, wealth: 2 } }, { text: "英语六级，借助词典", mod: { health: 0, academic: 6, social: 1, wealth: 0 } }, { text: "只会简单单词", mod: { health: 0, academic: -2, social: -1, wealth: -1 } }, { text: "正在苦学小语种", mod: { health: -3, academic: 4, social: 2, wealth: -2 } }] },
+            { text: "📢 你参加过公众考古活动吗？", options: [{ text: "经常担任讲解员，很受欢迎", mod: { health: 2, academic: 4, social: 12, wealth: 2 } }, { text: "偶尔参与，表现平平", mod: { health: 1, academic: 1, social: 3, wealth: 0 } }, { text: "从不参与，觉得浪费时间", mod: { health: 0, academic: -1, social: -4, wealth: -1 } }, { text: "组织过大型公众考古节", mod: { health: -2, academic: 5, social: 15, wealth: 5 } }] },
+            { text: "🧰 你的动手能力（修复/绘图/测量）？", options: [{ text: "心灵手巧，修复过整器", mod: { health: 2, academic: 8, social: 2, wealth: 3 } }, { text: "基本操作没问题", mod: { health: 1, academic: 3, social: 1, wealth: 1 } }, { text: "经常打碎陶片", mod: { health: -2, academic: -4, social: -2, wealth: -2 } }, { text: "擅长3D建模与数字化", mod: { health: 0, academic: 7, social: 4, wealth: 5 } }] },
+            { text: "🧭 你在野外迷路时的第一反应？", options: [{ text: "冷静分析，用罗盘/手机定位", mod: { health: 3, academic: 5, social: 2, wealth: 0 } }, { text: "大声呼救，原地等待", mod: { health: -1, academic: 0, social: 3, wealth: -1 } }, { text: "恐慌乱跑，体力耗尽", mod: { health: -8, academic: -2, social: -4, wealth: -2 } }, { text: "依靠星空和地物判断方向", mod: { health: 4, academic: 6, social: 1, wealth: 0 } }] }
+        ];
+
+        let currentQuizQuestions = [];
+        let currentAnswers = [];
+        let gameState = { health: 80, academic: 50, social: 50, wealth: 20, history: [], turn: 0, gameActive: true };
+        const MAX_TURNS = 30;
+
+        const ENDINGS_MAP = {
+            "考古领队": { title: "🏆 考古领队", desc: "你主导的遗址入选「全国十大考古新发现」，学界赞誉、经费充裕，成为行业标杆。", tags: ["学术巅峰", "名利双收"], color: "tag-gold" },
+            "一代学阀": { title: "📜 一代学阀", desc: "评上学部委员，垄断核心期刊，门生遍布，但午夜梦回时只剩权术。", tags: ["权力", "学术垄断"], color: "tag-gold" },
+            "提桶跑路": { title: "🚚 提桶跑路", desc: "彻底转行，离开考古圈。多年后看到发掘新闻，内心再无波澜。", tags: ["平凡", "解脱"], color: "tag-gray" },
+            "工地老哥": { title: "⛏️ 工地老哥", desc: "沦为工地长期民工，日复一日挖土筛土，领队资格遥不可及。", tags: ["底层", "遗憾"], color: "tag-gray" },
+            "平庸是福": { title: "🍵 平庸是福", desc: "进入地方博物馆，喝茶看报混到退休，安稳却无波澜。", tags: ["躺平", "安稳"], color: "tag-blue" },
+            "非升即走": { title: "🔥 非升即走", desc: "高校青椒，课题、论文、人际关系压垮一切，最终抑郁成疾，黯然离场。", tags: ["内卷", "焦虑"], color: "tag-red" },
+            "锒铛入狱": { title: "⛓️ 锒铛入狱", desc: "参与文物造假/倒卖，东窗事发，铁窗中度过余生。", tags: ["犯罪", "贪婪"], color: "tag-red" },
+            "愿赌服输": { title: "💸 愿赌服输", desc: "爬上领导岗位后大肆贪墨考古经费，被巡视组带走，身败名裂。", tags: ["腐败", "落马"], color: "tag-red" },
+            "天灾人祸": { title: "🌊 天灾人祸", desc: "被排挤到最危险的边疆工地，突发塌方或山洪，殉职于探方之中。", tags: ["悲剧", "牺牲"], color: "tag-red" },
+            "执行领队": { title: "🪦 执行领队", desc: "干着领队的活，扛着所有责任，却一辈子没有正式领队资质，憋屈终老。", tags: ["憋屈", "工具人"], color: "tag-gray" },
+            "二线专家": { title: "🏛️ 二线专家", desc: "小城市博物馆深耕，成为当地文化名流，小富即安，受人尊敬。", tags: ["小富即安", "地头蛇"], color: "tag-blue" },
+            "终有一报": { title: "⚖️ 终有一报", desc: "考古勘探公司行贿围标，最终被举报判刑，因果循环。", tags: ["商业犯罪", "因果"], color: "tag-red" }
+        };
+
+        function shuffleArray(arr) { for (let i = arr.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [arr[i], arr[j]] = [arr[j], arr[i]]; } return arr; }
+        function randomizeQuiz() {
+            const shuffledMaster = shuffleArray([...MASTER_QUESTION_SET]);
+            const selected = shuffledMaster.slice(0, 5);
+            currentQuizQuestions = selected.map(q => ({ text: q.text, options: shuffleArray([...q.options]) }));
+            currentAnswers = new Array(5).fill(null);
+        }
+        function randomOffset(range = 3) { return Math.floor(Math.random() * (range * 2 + 1)) - range; }
+        function computeInitialStats() {
+            let stats = { health: 80, academic: 50, social: 50, wealth: 20 };
+            for (let i = 0; i < currentAnswers.length; i++) {
+                const ansIdx = currentAnswers[i];
+                if (ansIdx !== null) {
+                    let mod = { ...currentQuizQuestions[i].options[ansIdx].mod };
+                    if (window._randomStatIndices && window._randomStatIndices.includes(i)) {
+                        mod.health += randomOffset(3);
+                        mod.academic += randomOffset(3);
+                        mod.social += randomOffset(3);
+                        mod.wealth += randomOffset(3);
+                    }
+                    stats.health += mod.health;
+                    stats.academic += mod.academic;
+                    stats.social += mod.social;
+                    stats.wealth += mod.wealth;
+                }
+            }
+            stats.health = Math.min(100, Math.max(10, stats.health));
+            stats.academic = Math.min(100, Math.max(10, stats.academic));
+            stats.social = Math.min(100, Math.max(10, stats.social));
+            stats.wealth = Math.min(100, Math.max(0, stats.wealth));
+            return stats;
+        }
+
+        function renderQuiz() {
+            const container = document.getElementById('quizQuestions');
+            container.innerHTML = '';
+            const randomIndices = [];
+            const numRandom = Math.floor(Math.random() * 2) + 2;
+            while (randomIndices.length < numRandom) { const idx = Math.floor(Math.random() * 5); if (!randomIndices.includes(idx)) randomIndices.push(idx); }
+            currentQuizQuestions.forEach((q, idx) => {
+                const isRandom = randomIndices.includes(idx);
+                const qDiv = document.createElement('div');
+                qDiv.className = 'border-b border-slate-700 pb-4';
+                const randomTag = isRandom ? '<span class="random-badge ml-2 align-middle">🎲 随机波动 ±3</span>' : '';
+                qDiv.innerHTML = `<p class="font-bold text-amber-300 mb-2">${q.text}${randomTag}</p><div class="grid grid-cols-1 md:grid-cols-2 gap-2" id="quiz-${idx}"></div>`;
+                container.appendChild(qDiv);
+                const optionsDiv = qDiv.querySelector(`#quiz-${idx}`);
+                q.options.forEach((opt, optIdx) => {
+                    const btn = document.createElement('button');
+                    btn.className = `quiz-option text-left px-4 py-2 rounded-lg text-sm transition-all ${currentAnswers[idx] === optIdx ? 'bg-amber-800/60 border-amber-500' : 'bg-slate-800/40 border-slate-600'}`;
+                    btn.innerHTML = opt.text;
+                    btn.onclick = () => { currentAnswers[idx] = optIdx; renderQuiz(); const allAnswered = currentAnswers.every(v => v !== null); document.getElementById('startGameBtn').disabled = !allAnswered; };
+                    optionsDiv.appendChild(btn);
+                });
+            });
+            window._randomStatIndices = randomIndices;
+        }
+
+        // 游戏主逻辑
+        let storyEl, choicesEl, loaderContainer, turnCounterSpan;
+        let valHealth, valAcademic, valSocial, valWealth, barHealth, barAcademic, barSocial, barWealth;
+
+        function initGameDOM() {
+            storyEl = document.getElementById('storyText');
+            choicesEl = document.getElementById('choices');
+            loaderContainer = document.getElementById('loaderContainer');
+            turnCounterSpan = document.getElementById('turnCounter');
+            valHealth = document.getElementById('val-health');
+            valAcademic = document.getElementById('val-academic');
+            valSocial = document.getElementById('val-social');
+            valWealth = document.getElementById('val-wealth');
+            barHealth = document.getElementById('bar-health');
+            barAcademic = document.getElementById('bar-academic');
+            barSocial = document.getElementById('bar-social');
+            barWealth = document.getElementById('bar-wealth');
+        }
+
+        function updateUI() {
+            if (!gameState.gameActive) return;
+            valHealth.innerText = Math.floor(gameState.health);
+            barHealth.style.width = Math.min(100, Math.max(0, gameState.health)) + '%';
+            valAcademic.innerText = Math.floor(gameState.academic);
+            barAcademic.style.width = Math.min(100, Math.max(0, gameState.academic)) + '%';
+            valSocial.innerText = Math.floor(gameState.social);
+            barSocial.style.width = Math.min(100, Math.max(0, gameState.social)) + '%';
+            valWealth.innerText = Math.floor(gameState.wealth);
+            barWealth.style.width = Math.min(100, Math.max(0, gameState.wealth)) + '%';
+            turnCounterSpan.innerText = `第 ${gameState.turn} / ${MAX_TURNS} 回合`;
+        }
+
+        function clampStats() {
+            gameState.health = Math.min(100, Math.max(0, gameState.health));
+            gameState.academic = Math.min(100, Math.max(0, gameState.academic));
+            gameState.social = Math.min(100, Math.max(0, gameState.social));
+            gameState.wealth = Math.min(100, Math.max(0, gameState.wealth));
+        }
+
+        function shouldForceEndingByStats() {
+            const h = gameState.health, a = gameState.academic, s = gameState.social, w = gameState.wealth;
+            if (h <= 15) return true;
+            if (w >= 85 && s >= 70) return true;
+            if (w >= 80 && a <= 40) return true;
+            if (a >= 85 && s <= 30) return true;
+            if (a >= 80 && s >= 75 && w >= 70) return true;
+            if (a >= 75 && w >= 60 && s >= 60) return true;
+            if (s >= 70 && a <= 50 && w <= 50) return true;
+            if (w <= 20 && a <= 45 && s <= 45) return true;
+            if (gameState.turn >= MAX_TURNS) return true;
+            return false;
+        }
+
+        function renderEnding(endingTitle) {
+            const ending = ENDINGS_MAP[endingTitle] || ENDINGS_MAP["工地老哥"];
+            storyEl.innerText = `【${ending.title}】\n${ending.desc}`;
+            choicesEl.innerHTML = `<div class="card p-6 text-center border-2 border-amber-500/60 bg-black/40"><div class="flex flex-wrap gap-2 justify-center mb-4">${ending.tags.map(t => `<span class="ending-tag ${ending.color}">${t}</span>`).join('')}</div><p class="text-amber-400 text-lg font-bold mb-4">🏺 掘地武士的旅途就此终结 🏺</p><button id="restartBtn" class="bg-amber-600 hover:bg-amber-500 text-white px-6 py-2 rounded-full font-bold transition-all shadow-lg">🔄 重开发掘季</button></div>`;
+            document.getElementById('restartBtn')?.addEventListener('click', () => location.reload());
+            gameState.gameActive = false;
+        }
+
+        function setLoading(loading) {
+            if (loading) { loaderContainer.classList.remove('hidden'); storyEl.classList.add('opacity-50'); } 
+            else { loaderContainer.classList.add('hidden'); storyEl.classList.remove('opacity-50'); }
+        }
+
+        // 调用 DeepSeek API (前端直接调用，密钥暴露)
+        async function callDeepSeek(messages) {
+            const response = await fetch(DEEPSEEK_API_URL, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${DEEPSEEK_API_KEY}`
+                },
+                body: JSON.stringify({
+                    model: MODEL_NAME,
+                    messages: messages,
+                    temperature: 0.85,
+                    max_tokens: 1100,
+                    stream: false
+                })
+            });
+            if (!response.ok) {
+                const errText = await response.text();
+                throw new Error(`DeepSeek API 错误 ${response.status}: ${errText}`);
+            }
+            const data = await response.json();
+            if (!data.choices || !data.choices[0] || !data.choices[0].message) {
+                throw new Error("API 返回格式异常");
+            }
+            return data.choices[0].message.content;
+        }
+
+        async function callAIGame(previousChoice = null) {
+            if (!gameState.gameActive) return;
+            if (previousChoice && gameState.history.length > 0) {
+                const lastTurn = gameState.history[gameState.history.length - 1];
+                if (lastTurn?.options) {
+                    const chosen = lastTurn.options.find(opt => opt.text === previousChoice);
+                    if (chosen?.change) {
+                        gameState.health += chosen.change.health || 0;
+                        gameState.academic += chosen.change.academic || 0;
+                        gameState.social += chosen.change.social || 0;
+                        gameState.wealth += chosen.change.wealth || 0;
+                        clampStats(); updateUI();
+                    }
+                }
+            }
+            gameState.turn++; updateUI();
+            if (shouldForceEndingByStats()) { forceEndingByStats(); setLoading(false); return; }
+            setLoading(true);
+            choicesEl.innerHTML = '<div class="text-center text-amber-500 animate-pulse py-4">⛏️ 掘地武士正在凝聚力量...</div>';
+
+            const systemPrompt = `你是「掘地武士模拟器」的文字冒险引擎，主题是考古本科毕业生的硬核职场与升学之路。游戏必须在1~30回合内走向12种结局之一。每一轮数值变化幅度 -12~+15，剧情真实残酷。结局触发条件严格按照以下规则：健康≤20→天灾人祸；财富≥85且人脉≥70→愿赌服输；财富≥80且学术≤40→锒铛入狱；学术≥85且人脉≤30→非升即走；学术≥80且人脉≥75且财富≥70→一代学阀；学术≥75且财富≥60且人脉≥60→考古领队；人脉≥70且学术≤50且财富≤50→执行领队；财富≤20且学术≤45且人脉≤45→工地老哥；学术55~70且人脉≤55且财富≤50→二线专家；人脉≥65且财富≥50且学术≤60→平庸是福；财富≤10且人脉≤30→提桶跑路；财富≥65且人脉≥60且学术≥65→终有一报。返回纯JSON格式: {"story":"...","options":[{"text":"...","change":{"health":0,"academic":0,"social":0,"wealth":0}}],"isOver":false,"ending":null}`;
+            
+            let userMessage = `当前回合数: ${gameState.turn}/${MAX_TURNS}\n属性:\n- 健康: ${gameState.health}\n- 学术: ${gameState.academic}\n- 人脉: ${gameState.social}\n- 财富: ${gameState.wealth}\n最近经历: ${gameState.history.slice(-1).map(h => h.story?.substring(0, 100)).join(' ') || '故事刚刚开始'}\n`;
+            if (gameState.turn === 1 && !previousChoice) userMessage += `请生成掘地武士模拟器的开场剧情：主角刚从考古系本科毕业，面临找工作或升学的十字路口。给出三个符合本科毕业生境遇的选项。`;
+            else userMessage += `请根据当前状态推进剧情，加速向某个结局靠拢。${previousChoice ? `玩家上一轮选择了：“${previousChoice}”。` : ''}`;
+
+            const messages = [
+                { role: "system", content: systemPrompt },
+                { role: "user", content: userMessage }
+            ];
+
+            try {
+                const aiResponseText = await callDeepSeek(messages);
+                let cleaned = aiResponseText.replace(/```json/gi, '').replace(/```/g, '').trim();
+                const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
+                if (!jsonMatch) throw new Error("未找到JSON");
+                const aiResponse = JSON.parse(jsonMatch[0]);
+                storyEl.innerText = aiResponse.story;
+                if (aiResponse.isOver === true && aiResponse.ending && ENDINGS_MAP[aiResponse.ending]) { renderEnding(aiResponse.ending); setLoading(false); return; }
+                if (shouldForceEndingByStats()) { forceEndingByStats(); setLoading(false); return; }
+                let options = (aiResponse.options && Array.isArray(aiResponse.options)) ? aiResponse.options.slice(0, 4) : [];
+                if (options.length === 0) options = [{ text: "投简历到省考古所", change: { health: 0, academic: 3, social: 4, wealth: 2 } }, { text: "报考本校研究生", change: { health: -2, academic: 8, social: 1, wealth: -3 } }, { text: "去私人勘探公司赚快钱", change: { health: -4, academic: -2, social: -1, wealth: 12 } }];
+                gameState.history.push({ story: aiResponse.story, options });
+                if (gameState.history.length > 6) gameState.history.shift();
+                choicesEl.innerHTML = '';
+                for (let opt of options) {
+                    const btn = document.createElement('button');
+                    btn.className = "btn-choice w-full text-left font-medium flex justify-between items-center group";
+                    btn.innerHTML = `<span class="text-slate-200 group-hover:text-amber-400">⚔️ ${opt.text}</span><span class="text-xs text-slate-500 opacity-0 group-hover:opacity-100 transition">→</span>`;
+                    btn.onclick = () => callAIGame(opt.text);
+                    choicesEl.appendChild(btn);
+                }
+            } catch (error) {
+                console.error(error);
+                storyEl.innerText = "📡 工地信号中断，但命运齿轮仍在转动。点击下方选项继续。";
+                const fallback = [{ text: "应聘某遗址考古项目", change: { health: -3, academic: 5, social: 2, wealth: 3 } }, { text: "考研冲刺班", change: { health: -2, academic: 8, social: 0, wealth: -4 } }, { text: "托关系进文物局", change: { health: 1, academic: -2, social: 9, wealth: 1 } }];
+                choicesEl.innerHTML = '';
+                for (let opt of fallback) {
+                    const btn = document.createElement('button');
+                    btn.className = "btn-choice w-full text-left";
+                    btn.innerText = opt.text;
+                    btn.onclick = () => {
+                        gameState.health += opt.change.health; gameState.academic += opt.change.academic; gameState.social += opt.change.social; gameState.wealth += opt.change.wealth;
+                        clampStats(); updateUI(); callAIGame(opt.text);
+                    };
+                    choicesEl.appendChild(btn);
+                }
+            } finally { setLoading(false); updateUI(); if (gameState.gameActive && shouldForceEndingByStats()) forceEndingByStats(); }
+        }
+
+        function forceEndingByStats() {
+            const h = gameState.health, a = gameState.academic, s = gameState.social, w = gameState.wealth;
+            let endingKey = "工地老哥";
+            if (h <= 15) endingKey = "天灾人祸";
+            else if (w >= 85 && s >= 70) endingKey = "愿赌服输";
+            else if (w >= 80 && a <= 40) endingKey = "锒铛入狱";
+            else if (a >= 85 && s <= 30) endingKey = "非升即走";
+            else if (a >= 80 && s >= 75 && w >= 70) endingKey = "一代学阀";
+            else if (a >= 75 && w >= 60 && s >= 60) endingKey = "考古领队";
+            else if (s >= 70 && a <= 50 && w <= 50) endingKey = "执行领队";
+            else if (w <= 20 && a <= 45 && s <= 45) endingKey = "工地老哥";
+            else if (a >= 55 && a <= 70 && s <= 55 && w <= 50) endingKey = "二线专家";
+            else if (s >= 65 && w >= 50 && a <= 60) endingKey = "平庸是福";
+            else if (w <= 10 && s <= 30) endingKey = "提桶跑路";
+            else if (w >= 65 && s >= 60 && a >= 65) endingKey = "终有一报";
+            renderEnding(endingKey);
+        }
+
+        function startGame() {
+            try {
+                const stats = computeInitialStats();
+                gameState = { health: stats.health, academic: stats.academic, social: stats.social, wealth: stats.wealth, history: [], turn: 0, gameActive: true };
+                document.getElementById('characterCreation').style.display = 'none';
+                document.getElementById('gameMain').style.display = 'block';
+                initGameDOM();
+                updateUI();
+                callAIGame(null);
+            } catch (err) {
+                console.error("启动失败:", err);
+                document.getElementById('quizQuestions').innerHTML = `<div class="error-message">❌ 启动失败：${err.message}。请刷新页面重试。</div>`;
+            }
+        }
+
+        randomizeQuiz();
+        renderQuiz();
+        document.getElementById('startGameBtn').disabled = true;
+        document.getElementById('startGameBtn').addEventListener('click', startGame);
+    </script>
+</body>
+</html>
